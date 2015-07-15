@@ -17,21 +17,24 @@ class Cromossoma:public Array<bool>{
 		//construtores
 		Cromossoma(int tamanho):Array<bool>(tamanho){fitness=0;}
 		Cromossoma():Array <bool>(){fitness=0;}
-		Cromossoma(Cromossoma &);
+		Cromossoma(const Cromossoma &);
       //métodos
 		void 			calculaFitness(int nrhs,mxArray **prhs){fitness=ffitness((Array <bool> &) *this,nrhs,prhs);}
 		void			setDim(int tamanho);
 		double			&getFitness()    {return fitness;}
 		void			muta(float prob,Random &R);
 		void			print();
-
+		void			flip(int bit);
       //opreadores
       Cromossoma    	operator =(Cromossoma in);
 
 };
 
-Cromossoma::Cromossoma(Cromossoma &in):Array<bool>( in){
-
+Cromossoma::Cromossoma(const Cromossoma &in){
+	
+	remove(); //não estou certo
+	aloca(in.tamanho);
+	for(int i=0;i<getDim();i++) array[i] = in.array[i];
 	fitness=in.fitness;
 }
 
@@ -62,6 +65,11 @@ void Cromossoma::print(){
 	mexPrintf("  ");
 	mexPrintf("%f\n",fitness);
 }
+
+void Cromossoma::flip(int bit){
+  this->operator [](bit) = !this->operator [](bit);
+}
+
 //---------------------------------------------------------------------------
 //
 //---------------------------------------------------------------------------
@@ -87,12 +95,13 @@ class Populacao{
 	void		setDim(int tamanho,int n_bits,int nrhs,const mxArray *prhs[]); //muda
 	void 		torneio(int n_torneios,int n_gladiadores);
 	float 		calculaSemelhanca(int i,int j);//incesto dá merda
-	void		crossover(double,double,double);
+	void		crossover(double,double,double,double);
 	void 		mutacao(double media,double sd){
 		int i=a.randArray(array.getDim());
 		array[i].muta(a.randn(media,sd),a);
 		array[i].calculaFitness(nrhs,prhs);
 	}
+	void 		mutacaoInversa();
 	//operadores
 	inline Cromossoma	&operator [](int indice){return array[indice];}
 	Populacao		     operator  =(Populacao in);
@@ -169,9 +178,18 @@ float Populacao::calculaSemelhanca(int i,int j){
 	for(int k=0;k<array.getDim();k++)if(array[i][k]==array[j][k]) coincide++;
 	return (double)coincide/array.getDim();
 }
+//tenho de pensar
+void Populacao::mutacaoInversa(){
+	unsigned long long vitima = a.randArray(array.getDim());
+	//array[vitima]
+	
+	array[vitima].inverte(a.randArray(array[vitima].getDim()),a.randArray(array[vitima].getDim()));
+	array[vitima].calculaFitness(nrhs,prhs);
+}
+
 //cruzamento uniforme
-void Populacao::crossover(double media,double sd,double erro){
-	Cromossoma	corte(n_bits);
+void Populacao::crossover(double media,double sd,double erro,double pCrossMutaConsangInv){
+	Cromossoma	corte(n_bits);//tem de ser pensado
 	Populacao	Filho(2,n_bits,nrhs,(const mxArray **)prhs);
 	int 		pai=a.randArray(array.getDim()),mae=a.randArray(array.getDim()),i;
 
@@ -186,8 +204,10 @@ void Populacao::crossover(double media,double sd,double erro){
 			Filho[0][i]=array[mae][i];
 		}
 
-	for(i=0;i<Filho.getDim();i++){
-		Filho[i].muta(calculaSemelhanca(pai,mae)*erro,a);
+	for(i=0;i<Filho.getDim();i++){ //vou mudar isto, tenho de pensar
+		if(calculaSemelhanca(pai,mae) > pCrossMutaConsangInv) //provavel argumento de entrada
+			Filho[i].inverte(a.randArray(Filho[i].getDim()),a.randArray(Filho[i].getDim()));
+		else Filho[i].muta(calculaSemelhanca(pai,mae)*erro,a);
 		Filho[i].calculaFitness(nrhs,prhs);
 		array[a.randArray(array.getDim())] = Filho[i];
 	}
@@ -204,7 +224,7 @@ Populacao::Populacao(Populacao &in){
 	for(int i=0;i<array.getDim();i++) array[i]=in.array[i];
 }
 
-//em obras
+//em obras tem ser mudado
 Populacao::Populacao(int tamanho,int n_bits,int nrhs,const mxArray *prhs[]){
 
 	array.setDim(tamanho);
@@ -213,7 +233,7 @@ Populacao::Populacao(int tamanho,int n_bits,int nrhs,const mxArray *prhs[]){
 	this->prhs   = (mxArray **)prhs;
 	
 	for(int i=0;i<tamanho;i++){
-		array[i].setDim(n_bits);
+		array[i].setDim(n_bits); //ver o aloca do array
 		gera(i);
 		array[i].calculaFitness(nrhs,(mxArray **)prhs);
 	}

@@ -54,6 +54,7 @@
 #include <ctime>
 #include <cstdlib>
 #include <cassert>
+#define _USE_MATH_DEFINES
 #include "math.h"
 
 struct Mt32Traits{
